@@ -12,7 +12,8 @@
 #include "LightManager.hpp"
 #include "KeyStates.hpp"
 #include "Key.hpp"
-#include "BasicObject.hpp"
+#include "SilhouetteObj.hpp"
+#include "StarObject.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -33,13 +34,16 @@ public:
 
     void Update();
 
-    virtual std::string getApplicationName() { return "Starlight Application"; }
-
-    void onKeyPress(int key, int scancode, int mods) override;
-
+    virtual std::string getApplicationName() override { return "Instance Rendering"; }
 protected:
 
 private:
+    const int keyWaitFrames = 5; 
+    int waitCounter = 0;
+
+    star::StarObject* plant = nullptr; 
+
+    void onKeyPress(int key, int scancode, int mods) override;
     void onKeyRelease(int key, int scancode, int mods) override;
     void onMouseMovement(double xpos, double ypos) override;
     void onMouseButtonAction(int button, int action, int mods) override;
