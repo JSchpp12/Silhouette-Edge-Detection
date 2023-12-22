@@ -15,7 +15,6 @@
 #include "managers/MapManager.hpp"
 
 #include "BasicCamera.hpp"
-#include "controllers/OptionsController.hpp"
 
 const uint32_t WIDTH = 1600;
 const uint32_t HEIGHT = 1200;
@@ -25,7 +24,6 @@ const uint32_t HEIGHT = 1200;
 
 int main() {
     std::unique_ptr<star::RenderOptions> renderOptions(new star::RenderOptions);
-    std::unique_ptr<star::OptionsController> optionsController(new star::OptionsController(*renderOptions));
 
     //TODO: give object and camera and lights to engine then pass ref to application -- will fix deletion problem
     auto engine = star::StarEngine();

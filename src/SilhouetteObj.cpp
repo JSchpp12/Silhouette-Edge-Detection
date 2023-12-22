@@ -7,7 +7,8 @@ std::unique_ptr<SilhouetteObj> SilhouetteObj::New(const std::string path)
 
 void SilhouetteObj::cleanupRender(star::StarDevice& device)
 {
-	this->geoPipeline.reset(); 
+	this->shadowVolumePipe.reset();
+	this->silhouettePipe.reset(); 
 
 	this->star::StarObject::cleanupRender(device); 
 }
@@ -18,25 +19,33 @@ std::unique_ptr<star::StarPipeline> SilhouetteObj::buildPipeline(star::StarDevic
 	star::StarGraphicsPipeline::defaultPipelineConfigInfo(settings, swapChainExtent, renderPass, pipelineLayout);
 	settings.inputAssemblyInfo.topology = vk::PrimitiveTopology::eTriangleListWithAdjacency;
 
-	////create geometry render
-	//{
-	//	std::string mediaPath = star::ConfigFile::getSetting(star::Config_Settings::mediadirectory);
+	std::string mediaPath = star::ConfigFile::getSetting(star::Config_Settings::mediadirectory);
+	{
+		std::string geomShaderPath = mediaPath + "shaders/silhouetteEdgeExtrusion.geom";
+		std::string vertShaderPath = mediaPath + "shaders/silhouetteEdgeExtrusion.vert";
+		std::string fragShaderPath = mediaPath + "shaders/silhouetteEdgeExtrusion.frag";
+		auto vertShader = star::StarShader(vertShaderPath, star::Shader_Stage::vertex);
+		auto fragShader = star::StarShader(fragShaderPath, star::Shader_Stage::fragment);
+		auto geomShader = star::StarShader(geomShaderPath, star::Shader_Stage::geometry);
 
-	//	std::string geomShaderPath = mediaPath + "/shaders/silhouetteEdgeExtrusion.geom";
-	//	std::string vertShaderPath = mediaPath + "/shaders/silhouetteEdgeExtrusion.vert"; 
-	//	std::string fragShaderPath = mediaPath + "/shaders/silhouetteEdgeExtrusion.frag"; 
-	//	auto vertShader = star::StarShader(vertShaderPath, star::Shader_Stage::vertex); 
-	//	auto fragShader = star::StarShader(fragShaderPath, star::Shader_Stage::fragment); 
-	//	auto geomShader = star::StarShader(geomShaderPath, star::Shader_Stage::geometry);
 
-	//	this->geoPipeline = std::make_unique<star::StarGraphicsPipeline>(device, settings, vertShader, fragShader, geomShader);
-	//	this->geoPipeline->init(); 
-	//}
+		this->shadowVolumePipe = std::make_unique<star::StarGraphicsPipeline>(device, settings, vertShader, fragShader, geomShader);
+		this->shadowVolumePipe->init();
+	}
+	{
+		std::string geom = mediaPath + "shaders/silhouetteEdge.geom"; 
+		std::string vert = mediaPath + "shaders/silhouetteEdge.vert";
+		std::string frag = mediaPath + "shaders/silhouetteEdge.frag"; 
+		auto vShader = star::StarShader(vert, star::Shader_Stage::vertex); 
+		auto fShader = star::StarShader(frag, star::Shader_Stage::fragment); 
+		auto gShader = star::StarShader(geom, star::Shader_Stage::geometry); 
 
-	//normal create
-	auto graphicsShaders = this->getShaders();
+		this->silhouettePipe = std::make_unique<star::StarGraphicsPipeline>(device, settings, vShader, fShader, gShader); 
+		this->silhouettePipe->init(); 
+	}
 
-	auto newPipeline = std::make_unique<star::StarGraphicsPipeline>(device, settings, graphicsShaders.at(star::Shader_Stage::vertex), graphicsShaders.at(star::Shader_Stage::fragment));
+	auto shaders = this->getShaders(); 
+	auto newPipeline = std::make_unique<star::StarGraphicsPipeline>(device, settings, shaders.at(star::Shader_Stage::vertex),shaders.at(star::Shader_Stage::fragment));
 	newPipeline->init();
 
 	return std::move(newPipeline);
@@ -44,21 +53,31 @@ std::unique_ptr<star::StarPipeline> SilhouetteObj::buildPipeline(star::StarDevic
 
 void SilhouetteObj::recordRenderPassCommands(star::StarCommandBuffer& commandBuffer, vk::PipelineLayout& pipelineLayout, int swapChainIndexNum, uint32_t vb_start, uint32_t ib_start)
 {
+	int ii = ib_start;
+
 	this->star::StarObject::recordRenderPassCommands(commandBuffer, pipelineLayout, swapChainIndexNum, vb_start, ib_start); 
 
-	//for (auto& mesh : this->getMeshes()) {
-	//	mesh->getMaterial().bind(commandBuffer, pipelineLayout, swapChainIndexNum); 
+	if (this->drawShadowVolume || this->drawSilhouetteEdge) {
 
-	//	commandBuffer.buffer(swapChainIndexNum).setLineWidth(1.0f);
+		commandBuffer.buffer(swapChainIndexNum).setLineWidth(1.0f);
 
-	//	uint32_t instanceCount = static_cast<uint32_t>(this->instances.size());
-	//	uint32_t vertexCount = star::CastHelpers::size_t_to_unsigned_int(mesh->getVertices().size());
-	//	uint32_t indexCount = star::CastHelpers::size_t_to_unsigned_int(mesh->getIndices().size());
-	//	commandBuffer.buffer(swapChainIndexNum).drawIndexed(indexCount, instanceCount, ib_start, 0, 0);
+		for (auto& mesh : this->getMeshes()) {
+			mesh->getMaterial().bind(commandBuffer, pipelineLayout, swapChainIndexNum);
 
-	//	vb_start += mesh->getVertices().size();
-	//	ib_start += mesh->getIndices().size();
-	//}
+			uint32_t instanceCount = static_cast<uint32_t>(this->instances.size());
+			uint32_t indexCount = star::CastHelpers::size_t_to_unsigned_int(mesh->getIndices().size());
+			if (this->drawShadowVolume) {
+				this->shadowVolumePipe->bind(commandBuffer.buffer(swapChainIndexNum));
+				commandBuffer.buffer(swapChainIndexNum).drawIndexed(indexCount, instanceCount, ii, 0, 0);
+			}
+			if (this->drawSilhouetteEdge) {
+				this->silhouettePipe->bind(commandBuffer.buffer(swapChainIndexNum)); 
+				commandBuffer.buffer(swapChainIndexNum).drawIndexed(indexCount, instanceCount, ii, 0, 0); 
+			}
+
+			ii += mesh->getIndices().size();
+		}
+	}
 }
 
 SilhouetteObj::SilhouetteObj(const std::string path)
@@ -151,6 +170,16 @@ void SilhouetteObj::loadFromFile(const std::string path)
 				currMaterial->ambient[0] = 1.0;
 				currMaterial->ambient[1] = 1.0;
 				currMaterial->ambient[2] = 1.0;
+			}
+			if (currMaterial->diffuse[0] == 0) {
+				currMaterial->diffuse[0] = 1.0;
+				currMaterial->diffuse[1] = 1.0;
+				currMaterial->diffuse[2] = 1.0;
+			}
+			if (currMaterial->specular[0] == 0) {
+				currMaterial->specular[0] = 1.0;
+				currMaterial->specular[1] = 1.0;
+				currMaterial->specular[2] = 1.0;
 			}
 
 			if (bumpMap)

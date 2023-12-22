@@ -11,6 +11,9 @@
 
 class SilhouetteObj : public star::StarObject {
 public:
+	bool drawSilhouetteEdge = false; 
+	bool drawShadowVolume = true; 
+
 	static std::unique_ptr<SilhouetteObj> New(const std::string path);
 
 	void cleanupRender(star::StarDevice& device) override; 
@@ -24,8 +27,7 @@ public:
 		uint32_t ib_start) override;
 
 protected:
-	std::unique_ptr<star::StarGraphicsPipeline> geoPipeline; 
-
+	std::unique_ptr<star::StarGraphicsPipeline> shadowVolumePipe, silhouettePipe; 
 
 	bool isBumpyMaterial = false; 
 

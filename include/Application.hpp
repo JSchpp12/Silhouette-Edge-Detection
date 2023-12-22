@@ -34,14 +34,21 @@ public:
 
     void Update();
 
-    virtual std::string getApplicationName() override { return "Instance Rendering"; }
+    virtual std::string getApplicationName() override { return "Silhouette"; }
 protected:
 
 private:
+    const float BOUNDARY = 1.75f;
+    const float AMT = 0.75f; 
     const int keyWaitFrames = 5; 
+    bool lightIncrease = true; 
+    star::Time lastFrameTime; 
     int waitCounter = 0;
 
-    star::StarObject* plant = nullptr; 
+    SilhouetteObj* airplane = nullptr; 
+    star::Light* light = nullptr; 
+
+    star::StarObjectInstance* sphereInstance = nullptr; 
 
     void onKeyPress(int key, int scancode, int mods) override;
     void onKeyRelease(int key, int scancode, int mods) override;
